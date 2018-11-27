@@ -1,9 +1,9 @@
 package tune.the.code.v2;
 
-import java.util.Deque;
 import java.util.Map;
+import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
  * @author Sevket Goekay <goekay@dbis.rwth-aachen.de>
@@ -12,33 +12,28 @@ import java.util.concurrent.ConcurrentLinkedDeque;
  */
 public class MessageQueue<T> {
 
-    private static final Map<Class<?>, MessageQueue<?>> queue = new ConcurrentHashMap<>();
+    private static final Map<Class<?>, MessageQueue<?>> queueMap = new ConcurrentHashMap<>();
 
     @SuppressWarnings("unchecked")
     public static <T> MessageQueue<T> getInstance(Class<T> clazz) {
-        return (MessageQueue<T>) queue.computeIfAbsent(clazz, k -> new MessageQueue<T>(new ConcurrentLinkedDeque<>()));
+        return (MessageQueue<T>) queueMap.computeIfAbsent(clazz, k -> new MessageQueue<T>(new ConcurrentLinkedQueue<>()));
     }
 
-    private final Deque<T> deque;
+    private final Queue<T> queue;
 
-    private MessageQueue(Deque<T> deque) {
-        this.deque = deque;
+    private MessageQueue(Queue<T> queue) {
+        this.queue = queue;
     }
 
-    /**
-     * The method name is chosen this way to be identical with the original API. Even though {@link Deque#pop()} exists,
-     * it throws Exception if the Deque is empty, which is good but does not align with the original API. It should
-     * return null. Therefore, we use {@link Deque#poll()}.
-     */
     public T pop() {
-        return deque.poll();
+        return queue.poll();
     }
 
     public void push(T obj) {
-        deque.push(obj);
+        queue.add(obj);
     }
 
     public boolean hasElements() {
-        return !deque.isEmpty();
+        return !queue.isEmpty();
     }
 }
