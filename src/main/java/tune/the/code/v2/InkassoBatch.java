@@ -39,11 +39,6 @@ public class InkassoBatch {
     public void runInkassoBatch() {
         // 1) because looking for an id in a list is O(n)
         // 2) because their accessor methods force the thread to sleep
-        Map<Integer, Contract> contractMap =
-                ContractProvider.getContracts()
-                                .stream()
-                                .collect(Collectors.toMap(Contract::getId, Function.identity()));
-
         Map<Integer, Bank> bankMap =
                 BankProvider.getBanks()
                             .stream()
@@ -54,15 +49,15 @@ public class InkassoBatch {
                                    .stream()
                                    .collect(Collectors.toMap(BankAccount::getId, Function.identity()));
 
-        contractMap.values()
-                   .parallelStream()
-                   .forEach(contract -> {
-                       BankAccount bankAccountForContract = bankAccountMap.get(contract.getBankAccountId());
-                       if (bankAccountForContract != null) {
-                           Bank bankForBankAccount = bankMap.get(bankAccountForContract.getBankId());
-                           processContract(contract, bankAccountForContract, bankForBankAccount);
-                       }
-                   });
+        ContractProvider.getContracts()
+                        .parallelStream()
+                        .forEach(contract -> {
+                            BankAccount bankAccountForContract = bankAccountMap.get(contract.getBankAccountId());
+                            if (bankAccountForContract != null) {
+                                Bank bankForBankAccount = bankMap.get(bankAccountForContract.getBankId());
+                                processContract(contract, bankAccountForContract, bankForBankAccount);
+                            }
+                        });
     }
 
     private void processContract(Contract contract, BankAccount bankAccountForContract, Bank bankForBankAccount) {
