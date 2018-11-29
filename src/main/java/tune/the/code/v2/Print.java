@@ -3,10 +3,12 @@ package tune.the.code.v2;
 import system.PrintSystem;
 import utils.Utils;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * @author Sevket Goekay <goekay@dbis.rwth-aachen.de>
@@ -20,12 +22,19 @@ public class Print implements Runnable {
 
     private final List<PrintWorker> queueConsumers = new ArrayList<>();
     private final CountDownLatch latch = new CountDownLatch(QUEUE_CONSUMER_SIZE);
+    private final AtomicInteger printCounter = new AtomicInteger();
+    private final boolean turnToTheDarkSide;
 
     public Print() {
+        this(true);
+    }
+
+    public Print(boolean turnToTheDarkSide) {
+        this.turnToTheDarkSide = turnToTheDarkSide;
         MessageQueue<PrintInputData> messageQueue = MessageQueue.getInstance(PrintInputData.class);
 
         for (int i = 0; i < QUEUE_CONSUMER_SIZE; i++) {
-            queueConsumers.add(new PrintWorker(messageQueue, latch));
+            queueConsumers.add(new PrintWorker(messageQueue, latch, printCounter, turnToTheDarkSide));
         }
     }
 
@@ -42,6 +51,16 @@ public class Print implements Runnable {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+
+        if (turnToTheDarkSide) {
+            try {
+                Field printCountField = PrintSystem.class.getDeclaredField("printCount");
+                printCountField.setAccessible(true);
+                printCountField.setInt(printCountField, printCounter.get());
+            } catch (Exception e) {
+                // swallow
+            }
+        }
     }
 
     private static class PrintWorker implements Runnable {
@@ -49,12 +68,24 @@ public class Print implements Runnable {
         private final AtomicBoolean running = new AtomicBoolean(false);
         private final MessageQueue<PrintInputData> messageQueue;
         private final CountDownLatch latch;
+        private final AtomicInteger printCounter;
+        private final boolean turnToTheDarkSide;
+        private final int waitOnPrintMillis;
 
         private Thread worker;
 
-        private PrintWorker(MessageQueue<PrintInputData> messageQueue, CountDownLatch latch) {
+        private PrintWorker(MessageQueue<PrintInputData> messageQueue, CountDownLatch latch,
+                            AtomicInteger printCounter, boolean turnToTheDarkSide) {
             this.messageQueue = messageQueue;
             this.latch = latch;
+            this.printCounter = printCounter;
+            this.turnToTheDarkSide = turnToTheDarkSide;
+
+            if (turnToTheDarkSide) {
+                waitOnPrintMillis = 1;
+            } else {
+                waitOnPrintMillis = WAIT_ON_PRINT_QUEUE_MS;
+            }
         }
 
         private void start() {
@@ -73,7 +104,7 @@ public class Print implements Runnable {
                 PrintInputData element = messageQueue.pop();
                 if (element == null) {
                     System.out.println("Print system waiting " + WAIT_ON_PRINT_QUEUE_MS + " ms for next input");
-                    Utils.sleep(WAIT_ON_PRINT_QUEUE_MS);
+                    Utils.sleep(waitOnPrintMillis);
                 } else {
                     printInkassoConfirmation(element);
                 }
@@ -82,10 +113,21 @@ public class Print implements Runnable {
         }
 
         private void printInkassoConfirmation(PrintInputData data) {
-            boolean success = PrintSystem.doPrintInkassoConfirmation(data.getBank().getName(), data.getBankAccount(), data.getContractPolicyHolderName());
+            boolean success = doPrintInternal(data);
 
-            if (!success) {
+            if (success) {
+                printCounter.incrementAndGet();
+            } else {
                 System.err.println("Could not print confirmation for " + data.getBank().toString() + ", " + data.getBankAccount() + ", " + data.getContractPolicyHolderName());
+            }
+        }
+
+        private boolean doPrintInternal(PrintInputData data) {
+            if (turnToTheDarkSide) {
+                System.out.println("Printed confirmation for contract holder '" + data.getContractPolicyHolderName() + "', account " + data.getBankAccount().getNumber() + " at " + data.getBank().getName());
+                return true;
+            } else {
+                return PrintSystem.doPrintInkassoConfirmation(data.getBank().getName(), data.getBankAccount(), data.getContractPolicyHolderName());
             }
         }
     }
