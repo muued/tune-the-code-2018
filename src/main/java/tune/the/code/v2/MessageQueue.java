@@ -1,9 +1,10 @@
 package tune.the.code.v2;
 
 import java.util.Map;
-import java.util.Queue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 /**
  * @author Sevket Goekay <goekay@dbis.rwth-aachen.de>
@@ -16,24 +17,20 @@ public class MessageQueue<T> {
 
     @SuppressWarnings("unchecked")
     public static <T> MessageQueue<T> getInstance(Class<T> clazz) {
-        return (MessageQueue<T>) queueMap.computeIfAbsent(clazz, k -> new MessageQueue<T>(new ConcurrentLinkedQueue<>()));
+        return (MessageQueue<T>) queueMap.computeIfAbsent(clazz, k -> new MessageQueue<T>(new LinkedBlockingQueue<>()));
     }
 
-    private final Queue<T> queue;
+    private final BlockingQueue<T> queue;
 
-    private MessageQueue(Queue<T> queue) {
+    private MessageQueue(BlockingQueue<T> queue) {
         this.queue = queue;
     }
 
-    public T pop() {
-        return queue.poll();
+    public T pop(int waitForMs) throws InterruptedException {
+        return queue.poll(waitForMs, TimeUnit.MILLISECONDS);
     }
 
-    public void push(T obj) {
-        queue.add(obj);
-    }
-
-    public boolean hasElements() {
-        return !queue.isEmpty();
+    public void push(T obj) throws InterruptedException {
+        queue.put(obj);
     }
 }

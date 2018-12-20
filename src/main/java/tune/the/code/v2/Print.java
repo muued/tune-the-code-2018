@@ -1,7 +1,6 @@
 package tune.the.code.v2;
 
 import system.PrintSystem;
-import utils.Utils;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -100,12 +99,18 @@ public class Print implements Runnable {
         @Override
         public void run() {
             running.set(true);
-            while (running.get() || messageQueue.hasElements()) {
-                PrintInputData element = messageQueue.pop();
-                if (element == null) {
-                    System.out.println("Print system waiting " + WAIT_ON_PRINT_QUEUE_MS + " ms for next input");
-                    Utils.sleep(waitOnPrintMillis);
-                } else {
+            runningLoop:
+            while (running.get()) {
+                while (true) {
+                    final PrintInputData element;
+                    try {
+                        element = messageQueue.pop(waitOnPrintMillis);
+                    } catch (final InterruptedException e) {
+                        break runningLoop;
+                    }
+                    if (null == element) {
+                        continue runningLoop;
+                    }
                     printInkassoConfirmation(element);
                 }
             }
@@ -113,21 +118,14 @@ public class Print implements Runnable {
         }
 
         private void printInkassoConfirmation(PrintInputData data) {
-            boolean success = doPrintInternal(data);
-
-            if (success) {
-                printCounter.incrementAndGet();
-            } else {
-                System.err.println("Could not print confirmation for " + data.getBank().toString() + ", " + data.getBankAccount() + ", " + data.getContractPolicyHolderName());
-            }
-        }
-
-        private boolean doPrintInternal(PrintInputData data) {
             if (turnToTheDarkSide) {
                 System.out.println("Printed confirmation for contract holder '" + data.getContractPolicyHolderName() + "', account " + data.getBankAccount().getNumber() + " at " + data.getBank().getName());
-                return true;
-            } else {
-                return PrintSystem.doPrintInkassoConfirmation(data.getBank().getName(), data.getBankAccount(), data.getContractPolicyHolderName());
+                printCounter.incrementAndGet();
+                return;
+            }
+            boolean success = PrintSystem.doPrintInkassoConfirmation(data.getBank().getName(), data.getBankAccount(), data.getContractPolicyHolderName());
+            if (!success) {
+                System.err.println("Could not print confirmation for " + data.getBank().toString() + ", " + data.getBankAccount() + ", " + data.getContractPolicyHolderName());
             }
         }
     }

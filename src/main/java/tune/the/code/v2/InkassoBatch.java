@@ -77,7 +77,12 @@ public class InkassoBatch {
         }
 
         printRequestsCount.incrementAndGet();
-        printSystemMessageQueue.push(new PrintInputData(contract, bankForBankAccount, bankAccountForContract));
+        try {
+            printSystemMessageQueue.push(new PrintInputData(contract, bankForBankAccount, bankAccountForContract));
+        } catch (final InterruptedException e) {
+            System.err.println(e.getLocalizedMessage());
+            // swallow
+        }
     }
 
     private boolean doInkassoInternal(BankAccount bankAccount) {
